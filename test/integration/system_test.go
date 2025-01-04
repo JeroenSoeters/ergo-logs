@@ -3,10 +3,12 @@ package integration
 import (
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 
 	"ergo.services/ergo"
 	"ergo.services/ergo/gen"
+	"github.com/jeroensoeters/ergo-logs/internal/collector"
 	"github.com/onsi/gomega"
 	"github.com/stretchr/testify/suite"
 )
@@ -43,6 +45,10 @@ func (s *SystemTestSuite) SetupTest() {
 	// We'll add more setup here as we develop our system
 }
 
+func TestSystemTestSuite(t *testing.T) {
+	suite.Run(t, new(SystemTestSuite))
+}
+
 // TestLogCollectorStartup verifies that our log collector actor
 // can start up and begin monitoring a log file
 func (s *SystemTestSuite) TestLogCollectorStartup() {
@@ -59,7 +65,7 @@ func (s *SystemTestSuite) TestLogCollectorStartup() {
 	s.Require().NoError(err)
 
 	processOpts := gen.ProcessOptions{}
-	pid, err := s.node.Spawn("log_collector", processOpts, LogCollectorProps(logFile))
+	pid, err := s.node.Spawn(collector.NewLogCollector, processOpts)
 	s.Require().NoError(err)
 
 	_, err = s.node.ProcessInfo(pid)
