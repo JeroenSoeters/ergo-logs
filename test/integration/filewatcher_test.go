@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -46,6 +47,7 @@ func (s *FileWatcherTestSuite) SetupSuite() {
 
 func (s *FileWatcherTestSuite) TearDownSuite() {
 	if s.node != nil {
+		fmt.Println("stopping node")
 		s.node.Stop()
 	}
 }
@@ -72,25 +74,34 @@ func (s *FileWatcherTestSuite) TestFileWatcher() {
 	err = os.WriteFile(logFile, []byte("initial log entry\n"), 0644)
 	s.Require().NoError(err)
 
+	fmt.Println("log file " + logFile)
+
 	// Create a test test test receiver
+	fmt.Println("[TEST] creating test receiver")
 	receiver := NewTestReceiver()
 	_, err = s.node.SpawnRegister(gen.Atom("log_processor"), func() gen.ProcessBehavior { return receiver }, gen.ProcessOptions{})
 	s.Require().NoError(err)
+	fmt.Println("[TEST] test receiver created")
 
-	watcher := filewatcher.New()
-	_, err = s.node.Spawn(func() gen.ProcessBehavior { return watcher }, gen.ProcessOptions{}, logFile)
+	fmt.Println("[TEST] creating watcher")
+	_, err = s.node.Spawn(filewatcher.New, gen.ProcessOptions{}, logFile)
 	s.Require().NoError(err)
+	fmt.Println("[TEST] watcher created")
 
 	time.Sleep(100 * time.Millisecond)
 
 	// Add a log entry and verify that it is collected
+	fmt.Println("[TEST] creating log entry")
 	logEntry := "another log entry\n"
 	err = os.WriteFile(logFile, []byte(logEntry), 0644)
 	s.Require().NoError(err)
+	fmt.Println("[TEST] log entry created")
 
 	g.Eventually(func() []filewatcher.FileContentMessage {
 		return receiver.messages
-	}).Should(gomega.HaveLen(1))
+	}, 5 * time.Second).Should(gomega.HaveLen(1))
 	s.Equal(logEntry, receiver.messages[0].Content)
 	s.Equal(logFile, receiver.messages[0].Path)
+
+	s.node.Wait()
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
@@ -17,6 +18,7 @@ type FileContentMessage struct {
 
 type FileWatcher struct {
 	act.Actor
+
 	filepath      string
 	watcher       *fsnotify.Watcher
 	offset        int64
@@ -25,12 +27,13 @@ type FileWatcher struct {
 
 func New() gen.ProcessBehavior {
 	return &FileWatcher{
-		offset:        0,
-		processorName: gen.Atom("log_processor"),
 	}
 }
 
 func (w *FileWatcher) ProcessInit(process gen.Process, args ...any) error {
+	fmt.Println("crash after this line")
+	w.Log().Info("started FileWatcher process with args %v", args)
+
 	fmt.Println("FileWatcher initializing")
 	if len(args) < 1 {
 		return errors.New("missing required filepath argument")
@@ -49,28 +52,40 @@ func (w *FileWatcher) ProcessInit(process gen.Process, args ...any) error {
 		return fmt.Errorf("failed to create watcher: %w", err)
 	}
 
+	err = watcher.Add(filepath)
+	if err != nil {
+		fmt.Printf("Error watching path %s", err)
+	}
+
 	w.filepath = filepath
 	w.watcher = watcher
 
-	fmt.Println("FileWatcher watching", w.filepath)
-
 	go w.watchFileEvents()
+
+	fmt.Println("FileWatcher watching", w.filepath)
 
 	return nil
 }
 
 func (w *FileWatcher) watchFileEvents() {
 	for {
+		fmt.Println("in watchFileEvents")
+		time.Sleep(1 * time.Second)
+		if w.watcher.Events != nil {
+			fmt.Println("we have watcher events!")
+		}
 		select {
 		case event, ok := <-w.watcher.Events:
 			fmt.Println("FileWatcher event", event)
 			if !ok {
+				fmt.Println("NOT OK!!!")
 				return
 			}
 
 			if event.Has(fsnotify.Write) {
 				file, err := os.Open(w.filepath)
 				if err != nil {
+					fmt.Printf("Error openinga file: %s", err)
 					//TODO: handle errors
 					continue
 				}
@@ -78,6 +93,7 @@ func (w *FileWatcher) watchFileEvents() {
 
 				fileInfo, err := file.Stat()
 				if err != nil {
+					fmt.Printf("Error stat-ing file: %s", err)
 					//TODO: handle Errors
 					continue
 				}
