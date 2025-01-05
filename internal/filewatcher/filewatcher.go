@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
@@ -27,14 +26,13 @@ type FileWatcher struct {
 
 func New() gen.ProcessBehavior {
 	return &FileWatcher{
+		//		processorName: gen.Atom("log_processor"),
 	}
 }
 
-func (w *FileWatcher) ProcessInit(process gen.Process, args ...any) error {
-	fmt.Println("crash after this line")
+func (w *FileWatcher) Init(args ...any) error {
 	w.Log().Info("started FileWatcher process with args %v", args)
 
-	fmt.Println("FileWatcher initializing")
 	if len(args) < 1 {
 		return errors.New("missing required filepath argument")
 	}
@@ -43,8 +41,6 @@ func (w *FileWatcher) ProcessInit(process gen.Process, args ...any) error {
 	if !ok {
 		return errors.New("filepath must be a string")
 	}
-
-	fmt.Println("FileWatcher starting")
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -62,30 +58,21 @@ func (w *FileWatcher) ProcessInit(process gen.Process, args ...any) error {
 
 	go w.watchFileEvents()
 
-	fmt.Println("FileWatcher watching", w.filepath)
-
 	return nil
 }
 
 func (w *FileWatcher) watchFileEvents() {
 	for {
-		fmt.Println("in watchFileEvents")
-		time.Sleep(1 * time.Second)
-		if w.watcher.Events != nil {
-			fmt.Println("we have watcher events!")
-		}
 		select {
 		case event, ok := <-w.watcher.Events:
-			fmt.Println("FileWatcher event", event)
 			if !ok {
-				fmt.Println("NOT OK!!!")
 				return
 			}
 
 			if event.Has(fsnotify.Write) {
 				file, err := os.Open(w.filepath)
 				if err != nil {
-					fmt.Printf("Error openinga file: %s", err)
+					fmt.Printf("Error opening file: %s", err)
 					//TODO: handle errors
 					continue
 				}
@@ -111,13 +98,14 @@ func (w *FileWatcher) watchFileEvents() {
 						Path:    w.filepath,
 					}
 
-					procID := gen.ProcessID{
-						Name: w.processorName,
-						Node: w.Actor.Node().Name(), //TODO: look up remote node name
-					}
+					//					procID := gen.ProcessID{
+					//						Name: w.processorName,
+					//						Node: w.Actor.Node().Name(), //TODO: look up remote node name
+					//					}
 
-					err = w.SendProcessID(procID, msg)
+					err = w.Send(gen.Atom("log_processor"), msg)
 					if err != nil {
+						fmt.Printf("Error sending message: %s", err)
 						//TODO: handle errors
 						continue
 					}
@@ -135,7 +123,6 @@ func (w *FileWatcher) watchFileEvents() {
 }
 
 func (w *FileWatcher) ProcessTerminate(reason error) {
-	fmt.Println("FileWatcher terminating")
 	if w.watcher != nil {
 		w.watcher.Close()
 	}
