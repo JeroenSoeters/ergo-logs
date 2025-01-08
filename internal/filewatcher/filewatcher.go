@@ -31,8 +31,6 @@ func New() gen.ProcessBehavior {
 }
 
 func (w *FileWatcher) Init(args ...any) error {
-	w.Log().Info("started FileWatcher process with args %v", args)
-
 	if len(args) < 1 {
 		return errors.New("missing required filepath argument")
 	}
@@ -50,13 +48,15 @@ func (w *FileWatcher) Init(args ...any) error {
 
 	err = watcher.Add(filepath)
 	if err != nil {
-		fmt.Printf("Error watching path %s", err)
+		return fmt.Errorf("failed to watch path %s: %w", filepath, err)
 	}
 
 	w.filepath = filepath
 	w.watcher = watcher
 
 	go w.watchFileEvents()
+
+	w.Log().Info("started FileWatcher process with args %v", args)
 
 	return nil
 }
@@ -72,7 +72,7 @@ func (w *FileWatcher) watchFileEvents() {
 			if event.Has(fsnotify.Write) {
 				file, err := os.Open(w.filepath)
 				if err != nil {
-					fmt.Printf("Error opening file: %s", err)
+					w.Log().Warning("error opening file %s: %w", w.filepath, err)
 					//TODO: handle errors
 					continue
 				}
@@ -80,7 +80,7 @@ func (w *FileWatcher) watchFileEvents() {
 
 				fileInfo, err := file.Stat()
 				if err != nil {
-					fmt.Printf("Error stat-ing file: %s", err)
+					w.Log().Warning("error stat-ing file %s: %w", w.filepath, err)
 					//TODO: handle Errors
 					continue
 				}
