@@ -5,15 +5,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jeroensoeters/ergo-logs/internal/messages"
+
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
 	"github.com/fsnotify/fsnotify"
 )
-
-type FileContentMessage struct {
-	Path    string
-	Content string
-}
 
 type FileWatcher struct {
 	act.Actor
@@ -26,7 +23,7 @@ type FileWatcher struct {
 
 func New() gen.ProcessBehavior {
 	return &FileWatcher{
-		//		processorName: gen.Atom("log_processor"),
+		processorName: gen.Atom("log_processor"),
 	}
 }
 
@@ -93,17 +90,17 @@ func (w *FileWatcher) watchFileEvents() {
 						continue
 					}
 
-					msg := FileContentMessage{
+					msg := messages.FileContentMessage{
 						Content: string(content),
 						Path:    w.filepath,
 					}
 
-					//					procID := gen.ProcessID{
-					//						Name: w.processorName,
-					//						Node: w.Actor.Node().Name(), //TODO: look up remote node name
-					//					}
+					procID := gen.ProcessID{
+						Name: w.processorName,
+						Node: gen.Atom("server@localhost"), //TODO: look up remote node name
+					}
 
-					err = w.Send(gen.Atom("log_processor"), msg)
+					err = w.Send(procID, msg)
 					if err != nil {
 						fmt.Printf("Error sending message: %s", err)
 						//TODO: handle errors
